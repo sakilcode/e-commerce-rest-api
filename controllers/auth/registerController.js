@@ -1,7 +1,8 @@
 import Joi from "joi";
 import { CustomErrorHandler, JwtService } from "../../services";
-import { User } from "../../models";
+import { RefreshToken, User } from "../../models";
 import bcrypt from "bcrypt";
+import { REFRESH_SECRET } from "../../config";
 
 const registerController = {
     async register(req, res, next) {
@@ -23,7 +24,6 @@ const registerController = {
         // Check if user is in the database
         try {
             const exist = await User.exists({ email })
-            console.log(exist)
             if (exist) {
                 return next(CustomErrorHandler.alreadyExist("This email is already exist"))
             }
@@ -41,19 +41,24 @@ const registerController = {
             password: hashedPassword,
         })
 
-        let accessToken;
+        let access_token;
+        let refresh_token;
         try {
             const result = await user.save();
 
             // Token
-            accessToken = JwtService.sign({ _id: result._id, role: result.role });
+            access_token = JwtService.sign({ _id: result._id, role: result.role });
+            refresh_token = JwtService.sign({ _id: result._id, role: result.role }, '1y', REFRESH_SECRET);
+
+            // Database whitelist
+            await RefreshToken.create({token: refresh_token})
 
 
         } catch (error) {
             return next(error)
         }
 
-        res.json({ accessToken })
+        res.json({ access_token, refresh_token })
     }
 }
 
